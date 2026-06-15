@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crossword — Client Onboarding</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --bg-soft:#f5f4f1;
+    --panel:#ffffff;
+    --ink:#1b1813;
+    --ink2:#605c54;
+    --ink3:#9a958c;
+    --hair:rgba(20,18,15,.10);
+    --hair-soft:rgba(20,18,15,.06);
+    --accent:#d8643f;
+    --accent-weak:rgba(216,100,63,.10);
+    --pill:#1c1a17;
+    --dot:rgba(20,18,15,.13);
+    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","SF Pro Icons","Helvetica Neue",Arial,sans-serif;
+    --grad:linear-gradient(90deg,#5b6ee8 0%,#8d6fd6 26%,#c77bc0 50%,#e88f8f 70%,#f0a85f 88%,#f4b24a 100%);
+    --card-shadow:0 1px 2px rgba(20,18,15,.04),0 10px 30px rgba(20,18,15,.05);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+
+  /* ---------- deck shell ---------- */
+  .deck{position:fixed;inset:0}
+  .slide{
+    position:absolute;inset:0;
+    display:flex;flex-direction:column;justify-content:center;
+    padding:clamp(32px,7vw,120px);
+    opacity:0;visibility:hidden;
+    transform:translateY(12px);
+    transition:opacity .5s ease,transform .5s ease,visibility .5s;
+  }
+  .slide.active{opacity:1;visibility:visible;transform:none}
+  .slide-inner{width:100%;max-width:1180px;margin:0 auto;position:relative}
+
+  /* faint dotted texture motif (echoes the reference cards) */
+  .dotband::before{
+    content:"";position:absolute;left:-2px;right:-2px;top:-26px;height:150px;
+    background-image:radial-gradient(var(--dot) 1px,transparent 1.4px);
+    background-size:22px 22px;
+    -webkit-mask-image:linear-gradient(180deg,#000,transparent);
+    mask-image:linear-gradient(180deg,#000,transparent);
+    opacity:.55;pointer-events:none;
+  }
+
+  /* ---------- shared type ---------- */
+  .eyebrow{
+    display:flex;align-items:center;gap:10px;
+    font-size:11.5px;font-weight:600;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--ink3);position:relative;
+  }
+  .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+  .eyebrow.accent{color:var(--accent)}
+
+  h1{font-weight:600;line-height:1.02;
+    font-size:clamp(40px,6.6vw,92px);letter-spacing:-.035em;color:var(--ink)}
+  h2{font-weight:600;line-height:1.04;
+    font-size:clamp(34px,5.2vw,70px);letter-spacing:-.03em;color:var(--ink)}
+  .lede{font-weight:400;
+    font-size:clamp(18px,2.2vw,27px);line-height:1.4;color:var(--ink2);
+    max-width:34ch;letter-spacing:-.012em}
+  .body{font-size:clamp(15px,1.3vw,18px);line-height:1.62;color:var(--ink2);
+    max-width:60ch;font-weight:400}
+
+  /* ---------- cover ---------- */
+  #s-cover .eyebrow{margin-bottom:30px}
+  #s-cover h1{margin-bottom:26px;max-width:15ch}
+  #s-cover .lede{max-width:40ch}
+  .cover-foot{margin-top:auto;padding-top:40px;display:flex;gap:10px;
+    align-items:center;font-size:12.5px;letter-spacing:.04em;color:var(--ink3)}
+  .cover-foot b{color:var(--ink);font-weight:600}
+
+  /* ---------- overview timeline ---------- */
+  #s-overview .eyebrow{margin-bottom:20px}
+  #s-overview h1{font-size:clamp(32px,4.6vw,60px);margin-bottom:clamp(44px,7vh,80px);max-width:18ch}
+  .track{position:relative;height:7px;border-radius:7px;background:var(--grad);
+    box-shadow:0 3px 22px rgba(199,123,192,.28);margin-bottom:6px}
+  .track::after{content:"";position:absolute;right:-1px;top:50%;
+    width:15px;height:15px;border-radius:50%;background:#fff;transform:translateY(-50%);
+    box-shadow:0 0 0 4px rgba(244,178,74,.22),0 1px 6px rgba(20,18,15,.18)}
+  .track .node{position:absolute;top:50%;width:9px;height:9px;border-radius:50%;
+    background:#fff;transform:translate(-50%,-50%);
+    box-shadow:0 0 0 2.5px rgba(255,255,255,.95),0 1px 3px rgba(20,18,15,.18)}
+  .cols{display:grid;grid-template-columns:repeat(4,1fr);margin-top:36px}
+  .col{padding-right:30px;position:relative}
+  .col + .col{padding-left:30px;border-left:1px solid var(--hair-soft)}
+  .col .day{color:var(--accent);font-size:13.5px;font-weight:600;letter-spacing:.02em;margin-bottom:14px}
+  .col .name{color:var(--ink);font-size:17px;font-weight:600;margin-bottom:10px;letter-spacing:-.01em}
+  .col .desc{color:var(--ink2);font-size:13.5px;line-height:1.55}
+
+  /* ---------- detail slides ---------- */
+  .detail-head{display:flex;align-items:baseline;gap:22px;margin:22px 0 24px;flex-wrap:wrap}
+  .detail .body{margin-bottom:28px}
+
+  /* shared split: copy left · image right */
+  .split{display:grid;grid-template-columns:1.02fr .98fr;
+    gap:clamp(32px,5vw,72px);align-items:center}
+  .split-copy .mini{margin-top:30px}
+
+  /* framed image — drop a real <img> in and the placeholder hides itself */
+  .figure{position:relative;border-radius:24px;overflow:hidden;
+    aspect-ratio:4/3;background:var(--bg-soft);
+    border:1px solid var(--hair);box-shadow:var(--card-shadow)}
+  .figure img{width:100%;height:100%;object-fit:cover;display:block;position:relative;z-index:1}
+  .figure img:not([src]),.figure img[src=""]{display:none}
+  .figure .ph{position:absolute;inset:0;z-index:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:16px;text-align:center;padding:36px}
+  .figure .ph::before{content:"";position:absolute;inset:0;
+    background-image:radial-gradient(var(--dot) 1px,transparent 1.4px);
+    background-size:22px 22px;opacity:.5}
+  .ph .ico{position:relative;width:56px;height:56px;border-radius:15px;
+    display:grid;place-items:center;color:#fff;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.4),0 6px 16px rgba(20,18,15,.14)}
+  .ph .cap{position:relative;max-width:30ch;font-size:13.5px;line-height:1.5;
+    color:var(--ink2);font-weight:500}
+  .ph .slot{position:relative;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--ink3);font-weight:600}
+
+  /* ---------- in-frame mockups (cover · build · refine · cta) ---------- */
+  .mock{position:absolute;inset:0;z-index:0;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;padding:26px}
+  .mock-soft{background:url('deck-bg-refine.png') center/cover no-repeat}
+  .mock-warm{background:url('deck-bg-landscape2.png') center/cover no-repeat}
+
+  .glass{background:rgba(255,255,255,.96);border:1px solid var(--hair);
+    border-radius:16px;box-shadow:0 10px 30px rgba(20,18,15,.10)}
+
+  /* chat widget (build + cover) */
+  .widget{width:min(82%,300px);padding:14px}
+  .wg-head{display:flex;align-items:center;gap:9px;padding-bottom:11px;
+    border-bottom:1px solid var(--hair-soft);margin-bottom:12px}
+  .wg-av{width:26px;height:26px;border-radius:8px;flex:0 0 26px;
+    background:linear-gradient(135deg,#9fb4f2,#b79fe0)}
+  .wg-name{font-size:12.5px;font-weight:600;color:var(--ink);letter-spacing:-.01em}
+  .wg-live{display:flex;align-items:center;gap:5px;margin-left:auto;
+    font-size:10px;font-weight:600;color:#1f9d63}
+  .wg-live i{width:6px;height:6px;border-radius:50%;background:#22b873;
+    box-shadow:0 0 0 3px rgba(34,184,115,.18)}
+  .wb{max-width:82%;font-size:11.5px;line-height:1.4;padding:8px 11px;border-radius:12px;
+    margin-bottom:8px;letter-spacing:-.01em}
+  .wb.them{background:var(--bg-soft);color:var(--ink);border-bottom-left-radius:4px}
+  .wb.me{background:#1c1a17;color:#fff;margin-left:auto;border-bottom-right-radius:4px}
+  /* product card inside a bubble */
+  .pcard{display:flex;gap:9px;align-items:center;background:#fff;border:1px solid var(--hair-soft);
+    border-radius:11px;padding:8px;margin-top:2px}
+  .pcard .pthumb{width:38px;height:38px;border-radius:8px;flex:0 0 38px;
+    background:linear-gradient(135deg,#f6b15a,#ef8f7e)}
+  .pcard .pinfo .pn{font-size:11px;font-weight:600;color:var(--ink);margin-bottom:3px}
+  .pcard .pinfo .pp{font-size:11px;font-weight:700;color:var(--accent)}
+
+  /* product-discovery card (cover hero) */
+  .figure--card img{z-index:0}
+  .mock-card{padding:20px;align-items:center;justify-content:center;
+    background:url('deck-bg-valley.png') center/cover no-repeat}
+  .pd-wrap{position:relative;z-index:2;width:100%;max-width:560px;display:flex;flex-direction:column}
+  .pd-eyebrow{align-self:flex-start;margin:0 0 12px 16px;
+    font-family:var(--sans);font-size:10.5px;font-weight:600;
+    letter-spacing:.16em;color:var(--ink);background:#f4f2e8;border:1px solid var(--hair-soft);
+    border-radius:11px;padding:7px 13px}
+  .pd-card{background:#fff;border-radius:18px;padding:16px;display:flex;flex-direction:column;
+    box-shadow:0 20px 48px rgba(20,18,15,.20)}
+  .pd-user{align-self:flex-end;max-width:82%;background:#6c63e6;color:#fff;
+    font-size:12px;font-weight:500;line-height:1.4;padding:9px 14px;
+    border-radius:16px;border-bottom-right-radius:5px;margin-bottom:13px}
+  .pd-agent{align-self:flex-start;font-size:12px;color:var(--ink);font-weight:500;
+    margin-bottom:13px}
+  .pd-prods{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .pd-item{display:flex;flex-direction:column;min-width:0}
+  .pd-img{position:relative;border-radius:12px;overflow:hidden;aspect-ratio:1/1.06;
+    background:linear-gradient(160deg,#edece8,#dcdbd6);margin-bottom:9px;
+    border:1px solid var(--hair)}
+  .pd-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .pd-cart{position:absolute;right:8px;bottom:8px;width:30px;height:30px;border-radius:50%;
+    background:#fff;box-shadow:0 3px 9px rgba(20,18,15,.2);display:grid;place-items:center}
+  .pd-cart svg{width:15px;height:15px}
+  .pd-name{font-size:11.5px;color:var(--ink2);font-weight:500;letter-spacing:-.01em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
+  .pd-price{font-size:12.5px;font-weight:700;color:var(--ink)}
+
+  /* landscape scene: photo left · chat right (cover hero) */
+  .figure--scene{border:2px solid rgba(20,18,15,.5)}
+  .figure--scene img{z-index:0}
+  .mock-scene{padding:0;align-items:stretch;justify-content:stretch;
+    background:
+      radial-gradient(80% 90% at 25% 20%,#cfc6ba 0%,transparent 60%),
+      radial-gradient(70% 80% at 95% 100%,#cdb8c6 0%,transparent 60%),
+      linear-gradient(120deg,#b3a89c 0%,#c4b6ab 45%,#a8a39c 70%,#c6b6c2 100%)}
+  .scene-scrim{position:absolute;top:0;right:0;bottom:0;left:36%;z-index:1;
+    background:linear-gradient(90deg,transparent,rgba(12,12,14,.5) 60%)}
+  .scene-chat{position:absolute;top:0;right:0;bottom:0;width:60%;z-index:2;
+    display:flex;flex-direction:column;justify-content:flex-end;gap:9px;
+    padding:38px 16px 16px}
+  .scene-status{position:absolute;top:13px;left:16px;right:16px;display:flex;
+    align-items:center;justify-content:space-between;color:#fff;font-size:10px;font-weight:700}
+  .scene-status svg rect,.scene-status svg path{fill:#fff}
+  .scene-status svg [stroke]{stroke:#fff}
+  .scene-chat .pm-bub{font-size:9px;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.18)}
+  .scene-chat .pm-name{font-size:8.5px}
+  /* product picks */
+  .scene-prods{display:flex;gap:9px;margin-top:2px}
+  .sp-card{flex:1;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.16);
+    border-radius:12px;overflow:hidden}
+  .sp-img{height:62px;background:linear-gradient(160deg,#cfe6fb,#9cc9ef)}
+  .sp-meta{padding:7px 9px 8px}
+  .sp-r1{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
+  .sp-name{font-size:9.5px;font-weight:600;color:#fff;letter-spacing:-.01em}
+  .sp-price{font-size:9.5px;font-weight:700;color:#fff}
+  .sp-sub{font-size:7px;color:rgba(255,255,255,.62);margin-top:2px}
+
+  /* phone-framed conversation (cover hero) */
+  .mock-hero{padding:24px 18px 0;align-items:flex-end;background:
+    radial-gradient(80% 70% at 78% 16%,#ecd9c8 0%,transparent 60%),
+    radial-gradient(90% 80% at 8% 102%,#c6cff0 0%,transparent 60%),
+    linear-gradient(140deg,#b9a89b 0%,#cdb5c4 52%,#aab2e0 100%)}
+  .phone{position:relative;height:calc(100% + 22px);aspect-ratio:9/19;
+    background:rgba(24,22,20,.46);backdrop-filter:blur(20px) saturate(1.1);
+    -webkit-backdrop-filter:blur(20px) saturate(1.1);
+    border:1px solid rgba(255,255,255,.22);border-radius:30px;overflow:hidden;
+    box-shadow:0 24px 52px rgba(20,18,15,.28);display:flex;flex-direction:column}
+  .ph-status{display:flex;align-items:center;justify-content:space-between;
+    padding:9px 16px 5px;font-size:9px;font-weight:700;color:#fff;flex:0 0 auto}
+  .ph-status .bars{display:flex;align-items:center;gap:3px}
+  .ph-status svg rect,.ph-status svg path{fill:#fff}
+  .ph-status svg [stroke]{stroke:#fff}
+  .ph-chat{padding:8px 9px 0;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+  .pm-row{display:flex;flex-direction:column;gap:3px}
+  .pm-name{display:flex;align-items:center;gap:4px;font-size:7.5px;font-weight:700;color:#fff}
+  .pm-name .pa{width:10px;height:10px;border-radius:50%;flex:0 0 10px}
+  .pm-name.you .pa{background:linear-gradient(135deg,#f6b15a,#ef8f7e)}
+  .pm-name.ai .pa{background:linear-gradient(135deg,#9fb4f2,#b79fe0)}
+  .pm-bub{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.16);
+    color:#fff;font-size:8px;line-height:1.5;
+    padding:6px 8px;border-radius:10px;letter-spacing:-.01em}
+  .pm-cards{display:flex;flex-direction:column;gap:4px;margin-top:5px}
+  .pm-card{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:5px 8px}
+  .pm-card b{display:block;font-size:8px;color:#fff;font-weight:600;margin-bottom:1px}
+  .pm-card span{font-size:6.5px;color:rgba(255,255,255,.62)}
+
+  /* rich chat widget (build preview) */
+  .mock-chat{padding:24px 18px 0;align-items:flex-end;
+    background:url('deck-bg-clouds.png') center/cover no-repeat}
+  .chatstack{display:flex;flex-direction:column;gap:11px;width:min(94%,372px);max-height:100%}
+  .chatwin{display:flex;flex-direction:column;overflow:hidden;
+    background:rgba(255,255,255,.74);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    border:1px solid rgba(255,255,255,.6);border-radius:18px;
+    box-shadow:0 20px 44px rgba(20,18,15,.20)}
+  .cw-head{display:flex;align-items:center;gap:9px;padding:12px 15px;
+    border-bottom:1px solid rgba(20,18,15,.07)}
+  .cw-head .cw-av{width:22px;height:22px;border-radius:7px;flex:0 0 22px;
+    background:linear-gradient(135deg,#9fb4f2,#b79fe0)}
+  .cw-head b{font-size:12.5px;color:var(--ink);font-weight:600;letter-spacing:-.01em}
+  .cw-head .cw-x{margin-left:auto;color:var(--ink3);font-size:16px;line-height:1}
+  .cw-body{padding:14px 15px;display:flex;flex-direction:column}
+  .cw-msg{font-size:11.5px;line-height:1.46;margin-bottom:11px;max-width:88%;letter-spacing:-.01em}
+  .cw-msg:last-child{margin-bottom:0}
+  .cw-msg.cust{margin-left:auto;background:#fff;border:1px solid var(--hair-soft);
+    color:var(--ink);padding:8px 11px;border-radius:13px;border-bottom-right-radius:4px;
+    box-shadow:0 1px 2px rgba(20,18,15,.05)}
+  .cw-msg.agent{color:var(--ink);margin-right:auto}
+  .cw-msg.agent b{font-weight:600}
+  .cw-input{display:flex;align-items:center;gap:8px;background:#fff;
+    border:1px solid var(--hair);border-radius:30px;padding:7px 7px 7px 16px;
+    box-shadow:0 8px 20px rgba(20,18,15,.12)}
+  .cw-input span{flex:1;font-size:11.5px;color:var(--ink3);letter-spacing:-.01em}
+  .cw-send{width:28px;height:28px;border-radius:50%;background:var(--pill);color:#fff;
+    display:grid;place-items:center;border:none;flex:0 0 28px}
+  .cw-send svg{width:13px;height:13px}
+
+  /* review thread (refine) */
+  .review{width:min(86%,320px);padding:13px 14px}
+  .rv-title{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;
+    color:var(--ink);margin-bottom:11px;letter-spacing:-.01em}
+  .rv-title .c{margin-left:auto;font-size:10px;font-weight:600;color:var(--ink3)}
+  .rrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--hair-soft)}
+  .rrow .rav{width:22px;height:22px;border-radius:50%;flex:0 0 22px}
+  .rrow:nth-child(2) .rav{background:linear-gradient(135deg,#9fb4f2,#b79fe0)}
+  .rrow:nth-child(3) .rav{background:linear-gradient(135deg,#f6b15a,#ef8f7e)}
+  .rrow:nth-child(4) .rav{background:linear-gradient(135deg,#74c79f,#4fb5b6)}
+  .rrow .rtxt{flex:1;min-width:0}
+  .rrow .rtxt b{display:block;font-size:11px;color:var(--ink);font-weight:600;margin-bottom:3px}
+  .rrow .rtxt i{display:block;height:4px;border-radius:3px;background:var(--hair);width:78%;font-style:normal}
+  .rtag{font-size:9.5px;font-weight:600;letter-spacing:.02em;padding:3px 8px;border-radius:20px;white-space:nowrap}
+  .rtag.flag{color:#c0492a;background:var(--accent-weak)}
+  .rtag.edit{color:#5a52c8;background:rgba(108,93,224,.12)}
+  .rtag.ok{color:#1f9d63;background:rgba(34,184,115,.13)}
+
+  /* live channel cluster (cta) */
+  .live{display:flex;flex-direction:column;align-items:center;gap:14px}
+  .live-orbit{display:flex;gap:9px}
+  .live-orbit .appic{width:34px;height:34px;border-radius:10px}
+  .live-orbit .appic svg{width:19px;height:19px}
+  .live-card{display:flex;align-items:center;gap:9px;padding:11px 16px}
+  .live-card .wg-live{margin-left:0;font-size:11.5px}
+  .live-card b{font-size:13px;color:var(--ink);font-weight:600;letter-spacing:-.01em}
+
+  /* floating stat chip (cover) */
+  .floatstat{position:absolute;top:30px;right:30px;display:flex;align-items:center;gap:8px;
+    padding:9px 13px}
+  .floatstat .fs-n{font-size:15px;font-weight:700;color:var(--ink);letter-spacing:-.02em}
+  .floatstat .fs-l{font-size:10px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.08em}
+  .qr{display:flex;gap:6px;margin-top:4px}
+  .qr span{font-size:10px;font-weight:600;color:var(--accent);background:var(--accent-weak);
+    border-radius:14px;padding:4px 9px}
+
+  /* ---------- connect: feature-row list (matches reference) ---------- */
+  .featlist{display:flex;flex-direction:column;gap:18px}
+  .featrow{display:flex;align-items:center;gap:22px;
+    background:var(--panel);border:1px solid var(--hair);border-radius:18px;
+    padding:16px 22px 16px 16px;box-shadow:0 1px 2px rgba(20,18,15,.03);
+    transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
+  .featrow:hover{transform:translateY(-1px);border-color:var(--hair);
+    box-shadow:0 10px 26px rgba(20,18,15,.07)}
+  .thumb{position:relative;flex:0 0 132px;width:132px;height:80px;border-radius:13px;
+    overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.45),0 5px 14px rgba(20,18,15,.10)}
+  .thumb.t-channel{background:url('thumb-bg-1.avif') center/cover no-repeat}
+  .thumb.t-kb{background:url('thumb-bg-2.avif') center/cover no-repeat}
+  .thumb.t-inbox{background:
+    radial-gradient(120% 120% at 15% 12%,#bdebd6 0%,transparent 55%),
+    radial-gradient(130% 130% at 92% 92%,#7fccc0 0%,transparent 60%),
+    linear-gradient(135deg,#74c79f,#4fb5b6)}
+
+  /* channel icon strip */
+  .iconstrip{position:absolute;left:9px;top:50%;transform:translateY(-50%);
+    display:flex;gap:6px}
+  .appic{width:26px;height:26px;border-radius:8px;background:#fff;
+    display:grid;place-items:center;box-shadow:0 2px 5px rgba(20,18,15,.14)}
+  .appic svg{width:15px;height:15px;display:block}
+
+  /* knowledge-base mini pills */
+  .kbpills{position:absolute;left:9px;top:9px;right:14px;display:flex;flex-direction:column;gap:5px}
+  .kbpill{display:flex;align-items:center;gap:6px;background:#fff;border-radius:6px;
+    padding:4px 7px;box-shadow:0 2px 5px rgba(20,18,15,.12);width:fit-content;max-width:100%}
+  .kbpill .kbi{width:11px;height:11px;border-radius:3px;flex:0 0 11px}
+  .kbpill span{font-size:7.5px;font-weight:600;color:var(--ink);white-space:nowrap;letter-spacing:-.01em}
+  .kbpill:nth-child(1) .kbi{background:#f0a85f}
+  .kbpill:nth-child(2) .kbi{background:#6b8df0}
+  .kbpill:nth-child(3) .kbi{background:#9a958c}
+
+  /* catalog product strip */
+  .prodstrip{position:absolute;inset:0;display:flex;gap:6px;padding:10px;align-items:center}
+  .prodcard{flex:1;height:60px;background:#fff;border-radius:7px;overflow:hidden;
+    display:flex;flex-direction:column;box-shadow:0 2px 5px rgba(20,18,15,.12)}
+  .prodcard .pimg{height:34px}
+  .prodcard:nth-child(1) .pimg{background:linear-gradient(135deg,#f6b15a,#ef8f7e)}
+  .prodcard:nth-child(2) .pimg{background:linear-gradient(135deg,#9fb4f2,#b79fe0)}
+  .prodcard:nth-child(3) .pimg{background:linear-gradient(135deg,#74c79f,#4fb5b6)}
+  .prodcard .pmeta{flex:1;padding:4px 5px;display:flex;flex-direction:column;gap:2.5px}
+  .prodcard .pmeta i{display:block;height:3px;border-radius:2px;background:var(--hair)}
+  .prodcard .pmeta i:first-child{width:80%}
+  .prodcard .pmeta i:last-child{width:46%;background:var(--accent);opacity:.75}
+
+  /* inbox mini chat */
+  .chatmini{position:absolute;left:9px;top:8px;right:12px;display:flex;flex-direction:column;gap:4px}
+  .chathead{display:flex;align-items:center;gap:5px}
+  .chathead .av{width:12px;height:12px;border-radius:50%;
+    background:linear-gradient(135deg,#f6b15a,#ef8f7e);flex:0 0 12px}
+  .chathead b{font-size:7px;color:var(--ink);font-weight:700}
+  .bub{background:#fff;border-radius:6px;padding:4px 6px;box-shadow:0 2px 4px rgba(20,18,15,.1);
+    font-size:6.5px;color:var(--ink2);font-weight:500;width:fit-content;max-width:88%}
+  .bub.me{align-self:flex-end;background:#1c1a17;color:#fff}
+  .feattxt .t{font-size:18px;font-weight:600;color:var(--ink);letter-spacing:-.015em;margin-bottom:5px}
+  .feattxt .s{font-size:15px;color:var(--ink2);line-height:1.4;letter-spacing:-.01em}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{font-size:12.5px;letter-spacing:.01em;color:var(--ink2);font-weight:500;
+    border:1px solid var(--hair-soft);border-radius:8px;padding:7px 13px;
+    background:var(--bg-soft)}
+
+  /* ---------- connect: two-column with source panel ---------- */
+  #s-connect .connect-grid{
+    display:grid;grid-template-columns:1.02fr .98fr;
+    gap:clamp(32px,5vw,72px);align-items:center;
+  }
+  #s-connect .connect-copy .mini{margin-top:30px}
+  .srcpanel{
+    position:relative;background:var(--panel);border:1px solid var(--hair);
+    border-radius:22px;padding:18px;box-shadow:var(--card-shadow);
+    display:flex;flex-direction:column;gap:12px;overflow:hidden;
+  }
+  .srcpanel::before{
+    content:"";position:absolute;left:0;right:0;top:0;height:104px;
+    background-image:radial-gradient(var(--dot) 1px,transparent 1.4px);
+    background-size:20px 20px;
+    -webkit-mask-image:linear-gradient(180deg,#000,transparent);
+    mask-image:linear-gradient(180deg,#000,transparent);
+    opacity:.5;pointer-events:none;
+  }
+  .srcrow{
+    position:relative;display:flex;align-items:center;gap:15px;
+    background:var(--panel);border:1px solid var(--hair-soft);border-radius:14px;
+    padding:14px 16px;box-shadow:0 1px 2px rgba(20,18,15,.03);
+    transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease;
+  }
+  .srcrow:hover{transform:translateY(-1px);border-color:var(--hair);
+    box-shadow:0 8px 20px rgba(20,18,15,.07)}
+  .srctile{
+    width:58px;height:58px;flex:0 0 58px;border-radius:13px;
+    display:grid;place-items:center;position:relative;overflow:hidden;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.4),0 5px 13px rgba(20,18,15,.12);
+  }
+  .srctile.g1{background:linear-gradient(135deg,#5b6ee8,#8d6fd6)}
+  .srctile.g2{background:linear-gradient(135deg,#c77bc0,#e88f8f)}
+  .srctile.g3{background:linear-gradient(135deg,#f0a85f,#f4b24a)}
+  .srctile svg{position:relative;filter:drop-shadow(0 1px 2px rgba(20,18,15,.12))}
+  .srctxt .t{font-size:15px;font-weight:600;color:var(--ink);letter-spacing:-.01em;margin-bottom:3px}
+  .srctxt .s{font-size:13px;color:var(--ink2);line-height:1.45}
+
+  /* rollout sub-stages (go-live slide) */
+  .stages{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:8px}
+  .stage{background:var(--panel);padding:24px 22px 26px;border:1px solid var(--hair);
+    border-radius:16px;box-shadow:var(--card-shadow);position:relative;overflow:hidden}
+  .stage::before{content:"";position:absolute;left:0;right:0;top:0;height:74px;
+    background-image:radial-gradient(var(--dot) 1px,transparent 1.4px);background-size:20px 20px;
+    -webkit-mask-image:linear-gradient(180deg,#000,transparent);
+    mask-image:linear-gradient(180deg,#000,transparent);opacity:.5;pointer-events:none}
+  .stage .pct{font-size:36px;font-weight:700;letter-spacing:-.03em;
+    background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1;position:relative}
+  .stage .slab{color:var(--accent);font-size:11.5px;font-weight:600;letter-spacing:.13em;
+    text-transform:uppercase;margin:13px 0 9px}
+  .stage .scopy{color:var(--ink2);font-size:13.5px;line-height:1.55}
+
+  /* mini progress on detail slides */
+  .mini{margin-top:34px;max-width:560px}
+  .mini-bar{height:5px;border-radius:5px;background:var(--hair-soft);position:relative;overflow:hidden}
+  .mini-fill{position:absolute;left:0;top:0;height:100%;border-radius:5px;
+    background:var(--grad);box-shadow:0 1px 10px rgba(199,123,192,.3)}
+  .mini-label{margin-top:11px;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);font-weight:600}
+
+  /* cta */
+  #s-cta h2{margin:20px 0 24px;max-width:14ch}
+  .cta-link{display:inline-flex;align-items:center;gap:11px;margin-top:32px;
+    font-family:var(--sans);font-size:15px;font-weight:600;color:#fff;
+    background:var(--pill);border:none;
+    border-radius:100px;padding:15px 24px;letter-spacing:.01em;cursor:pointer;
+    box-shadow:0 2px 10px rgba(20,18,15,.16);transition:transform .2s ease,box-shadow .2s ease}
+  .cta-link:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(20,18,15,.2)}
+  .cta-link span{color:var(--accent);font-size:17px;line-height:1}
+
+  /* ---------- chrome: nav, dots, counter ---------- */
+  .chrome{position:fixed;left:0;right:0;bottom:0;height:64px;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 clamp(24px,5vw,64px);z-index:20;pointer-events:none}
+  .brand{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
+  .brand b{color:var(--ink2);font-weight:600}
+  .nav{display:flex;align-items:center;gap:18px;pointer-events:auto}
+  .dots{display:flex;gap:8px}
+  .dots i{width:7px;height:7px;border-radius:50%;background:rgba(20,18,15,.16);
+    cursor:pointer;transition:.3s;display:block}
+  .dots i.on{background:var(--accent);transform:scale(1.15)}
+  .arrows{display:flex;gap:8px}
+  .arrows button{width:38px;height:38px;border-radius:50%;cursor:pointer;
+    background:var(--panel);border:1px solid var(--hair);color:var(--ink2);
+    font-size:16px;line-height:1;transition:.2s;display:grid;place-items:center}
+  .arrows button:hover{border-color:var(--accent);color:var(--ink)}
+  .arrows button:disabled{opacity:.35;cursor:default}
+  .arrows button:focus-visible,.dots i:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  .count{font-size:12px;letter-spacing:.08em;color:var(--ink3);font-variant-numeric:tabular-nums}
+  .count b{color:var(--ink)}
+
+  @media (max-width:760px){
+    .cols{grid-template-columns:1fr 1fr;gap:24px 0}
+    #s-connect .connect-grid{grid-template-columns:1fr;gap:28px}
+    .split{grid-template-columns:1fr;gap:28px}
+    .figure{aspect-ratio:16/10;max-height:46vh}
+    .col{padding:0 18px}
+    .col + .col{border-left:none}
+    .col:nth-child(odd){border-left:none;padding-left:0}
+    .stages{grid-template-columns:1fr}
+    .brand{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .slide{transition:opacity .2s;transform:none}
+  }
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+  <!-- 1 · COVER -->
+  <section class="slide active" id="s-cover">
+    <div class="slide-inner">
+      <div class="split">
+        <div class="split-copy dotband">
+          <div class="eyebrow"><span class="dot"></span>Onboarding</div>
+          <h1>From connect to&nbsp;live in two weeks</h1>
+          <p class="lede">How we bring Crossword into your store — and scale it to every customer, safely.</p>
+          <div class="cover-foot"><b>Crossword</b> · Client onboarding</div>
+        </div>
+        <figure class="figure figure--card" data-slot="cover">
+          <!-- Optional photo backdrop behind the card: <img src="deck-bg-clouds.png" alt=""> -->
+          <img alt="">
+          <div class="mock mock-card">
+            <div class="pd-wrap">
+              <div class="pd-eyebrow">PRODUCT DISCOVERY</div>
+              <div class="pd-card">
+                <div class="pd-user">I'm heading skiing this weekend. I need a new jacket!</div>
+                <div class="pd-agent">Here are three high-performance ski jackets:</div>
+                <div class="pd-prods">
+                  <div class="pd-item">
+                    <div class="pd-img"><img src="product-1.webp" alt=""><button class="pd-cart"><svg viewBox="0 0 24 24" fill="none"><path d="M6 8h12l-1 11H7L6 8z" stroke="#1b1813" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 8a3 3 0 0 1 6 0" stroke="#1b1813" stroke-width="1.6"/><path d="M12 11.5v4M10 13.5h4" stroke="#1b1813" stroke-width="1.6" stroke-linecap="round"/></svg></button></div>
+                    <div class="pd-name">Tundra Field Jacket (Taupe)</div>
+                    <div class="pd-price">$349.99</div>
+                  </div>
+                  <div class="pd-item">
+                    <div class="pd-img"><img src="product-2.webp" alt=""><button class="pd-cart"><svg viewBox="0 0 24 24" fill="none"><path d="M6 8h12l-1 11H7L6 8z" stroke="#1b1813" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 8a3 3 0 0 1 6 0" stroke="#1b1813" stroke-width="1.6"/><path d="M12 11.5v4M10 13.5h4" stroke="#1b1813" stroke-width="1.6" stroke-linecap="round"/></svg></button></div>
+                    <div class="pd-name">Watertight Shell (Teal)</div>
+                    <div class="pd-price">$349.99</div>
+                  </div>
+                  <div class="pd-item">
+                    <div class="pd-img"><img src="product-3.webp" alt=""><button class="pd-cart"><svg viewBox="0 0 24 24" fill="none"><path d="M6 8h12l-1 11H7L6 8z" stroke="#1b1813" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 8a3 3 0 0 1 6 0" stroke="#1b1813" stroke-width="1.6"/><path d="M12 11.5v4M10 13.5h4" stroke="#1b1813" stroke-width="1.6" stroke-linecap="round"/></svg></button></div>
+                    <div class="pd-name">Watertight Jacket (Olive)</div>
+                    <div class="pd-price">$240.00</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 · OVERVIEW TIMELINE -->
+  <section class="slide" id="s-overview">
+    <div class="slide-inner">
+      <div class="eyebrow"><span class="dot"></span>How it works</div>
+      <h1>Four steps to a live store manager</h1>
+      <div class="track">
+        <span class="node" style="left:0.6%"></span>
+        <span class="node" style="left:25.6%"></span>
+        <span class="node" style="left:50.6%"></span>
+        <span class="node" style="left:75.6%"></span>
+      </div>
+      <div class="cols">
+        <div class="col">
+          <div class="day">Day 1</div>
+          <div class="name">Connect</div>
+          <div class="desc">Sign up and connect your catalog, orders, and tools. Crossword drafts a baseline.</div>
+        </div>
+        <div class="col">
+          <div class="day">Day 5</div>
+          <div class="name">Build &amp; Preview</div>
+          <div class="desc">We tune it on your data and hand you a working preview to click through.</div>
+        </div>
+        <div class="col">
+          <div class="day">Day 10</div>
+          <div class="name">Refine</div>
+          <div class="desc">You flag gaps from real conversations; we iterate until it's ready for traffic.</div>
+        </div>
+        <div class="col">
+          <div class="day">Day 14</div>
+          <div class="name">Go Live</div>
+          <div class="desc">Start at 1% of conversations, watch the KPIs, then scale to 100%.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 · CONNECT -->
+  <section class="slide detail" id="s-connect">
+    <div class="slide-inner">
+      <div class="split">
+        <div class="split-copy">
+          <div class="eyebrow accent"><span class="dot"></span>Step 01 · Day 1</div>
+          <div class="detail-head"><h2>Connect your store</h2></div>
+          <p class="body">Connect the tools you sell and support on, sync your product catalog from Shopify or a custom feed, and add the policies Crossword should follow — refunds, cancellations, shipping. It learns your store from day one, with no engineering lift to start.</p>
+          <div class="chips">
+            <span class="chip">Shopify</span><span class="chip">WhatsApp</span>
+            <span class="chip">Instagram</span><span class="chip">Catalog &amp; policies</span>
+          </div>
+          <div class="mini">
+            <div class="mini-bar"><span class="mini-fill" style="width:18%"></span></div>
+            <div class="mini-label">Step 1 of 4</div>
+          </div>
+        </div>
+
+        <div class="featlist">
+          <div class="featrow">
+            <div class="thumb t-channel">
+              <div class="iconstrip">
+                <span class="appic"><svg viewBox="0 0 24 24" fill="none"><path d="M16.3 5.3c-.1-.1-.2-.1-.3-.1l-1.3.1c-.4-.7-1.1-1.5-2.1-1.5h-.2c-.4-.5-.9-.7-1.4-.7-1.3 0-2 1.6-2.4 2.7l-1.6.5c-.5.2-.5.2-.6.7L4.6 19.4 13 21l4.6-1L16.3 5.3zM12.5 4.4c.5.1.8.6 1 1.1l-1.5.5c0-.7.1-1.2.5-1.6zM11.4 3.6c.1 0 .3 0 .4.1-.4.4-.6 1.1-.6 1.9l-1.2.4c.3-.9.8-2.4 1.4-2.4z" fill="#95BF47"/></svg></span>
+                <span class="appic"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.7 4.8-1.3A10 10 0 1 0 12 2z" fill="#25D366"/><path d="M9 7.5c-.2-.5-.4-.5-.6-.5h-.5c-.2 0-.5.1-.7.3-.3.3-.9.9-.9 2.1s.9 2.4 1 2.6c.1.2 1.8 2.9 4.5 3.9 2.2.9 2.7.7 3.2.7s1.5-.6 1.7-1.2c.2-.6.2-1.1.1-1.2 0-.1-.2-.2-.5-.3l-1.7-.8c-.2-.1-.4-.1-.6.1l-.6.8c-.1.2-.3.2-.5.1-.3-.1-1.1-.4-2-1.3-.7-.6-1.2-1.4-1.3-1.6-.1-.2 0-.4.1-.5l.4-.5c.1-.2.1-.3.2-.5 0-.2 0-.3 0-.5L9 7.5z" fill="#fff"/></svg></span>
+                <span class="appic"><svg viewBox="0 0 24 24" fill="none"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5" fill="url(#ig)"/><circle cx="12" cy="12" r="4" fill="none" stroke="#fff" stroke-width="1.7"/><circle cx="17.2" cy="6.8" r="1.2" fill="#fff"/><defs><linearGradient id="ig" x1="3" y1="21" x2="21" y2="3"><stop stop-color="#FEDA75"/><stop offset=".45" stop-color="#FA7E1E"/><stop offset=".7" stop-color="#D62976"/><stop offset="1" stop-color="#962FBF"/></linearGradient></defs></svg></span>
+                <span class="appic"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2C6.5 2 2 6.1 2 11.2c0 2.9 1.4 5.4 3.7 7.1V22l3.4-1.9c.9.2 1.9.4 2.9.4 5.5 0 10-4.1 10-9.3S17.5 2 12 2z" fill="#0084FF"/><path d="M5.9 14.5l3.3-3.5 1.7 1.8 3.1-1.8-3.3 3.5-1.7-1.8-3.1 1.8z" fill="#fff"/></svg></span>
+              </div>
+            </div>
+            <div class="feattxt">
+              <div class="t">Connect tools</div>
+              <div class="s">Shopify, WhatsApp, Instagram &amp; more.</div>
+            </div>
+          </div>
+
+          <div class="featrow">
+            <div class="thumb t-channel">
+              <div class="prodstrip">
+                <div class="prodcard"><span class="pimg"></span><span class="pmeta"><i></i><i></i></span></div>
+                <div class="prodcard"><span class="pimg"></span><span class="pmeta"><i></i><i></i></span></div>
+                <div class="prodcard"><span class="pimg"></span><span class="pmeta"><i></i><i></i></span></div>
+              </div>
+            </div>
+            <div class="feattxt">
+              <div class="t">Store catalog</div>
+              <div class="s">Sync Shopify or upload a custom feed.</div>
+            </div>
+          </div>
+
+          <div class="featrow">
+            <div class="thumb t-kb">
+              <div class="kbpills">
+                <div class="kbpill"><span class="kbi"></span><span>Refund policy</span></div>
+                <div class="kbpill"><span class="kbi"></span><span>Cancellation policy</span></div>
+                <div class="kbpill"><span class="kbi"></span><span>Shipping &amp; returns</span></div>
+              </div>
+            </div>
+            <div class="feattxt">
+              <div class="t">Knowledge base</div>
+              <div class="s">Refund, cancellation &amp; shipping policies.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 · BUILD & PREVIEW -->
+  <section class="slide detail" id="s-build">
+    <div class="slide-inner">
+      <div class="split">
+        <div class="split-copy">
+          <div class="eyebrow accent"><span class="dot"></span>Step 02 · Day 5</div>
+          <div class="detail-head"><h2>Build &amp; Preview</h2></div>
+          <p class="body">We tune Crossword on your data and wire up the actions it can take — guided selling, order lookups, returns, WISMO. Within the week you get a working preview, grounded in your real catalog and policies, to click through and pressure-test.</p>
+          <div class="chips">
+            <span class="chip">Guided selling</span><span class="chip">Order lookups</span>
+            <span class="chip">Returns</span><span class="chip">WISMO</span>
+          </div>
+          <div class="mini">
+            <div class="mini-bar"><span class="mini-fill" style="width:46%"></span></div>
+            <div class="mini-label">Step 2 of 4</div>
+          </div>
+        </div>
+
+        <figure class="figure" data-slot="build">
+          <!-- Swap in a real image any time: <img src="build.png" alt="Live chat answering a shopper"> -->
+          <img alt="">
+          <div class="mock mock-chat">
+            <div class="phone">
+              <div class="ph-status">
+                <span>9:41</span>
+                <span class="bars">
+                  <svg width="14" height="9" viewBox="0 0 18 12" fill="none"><rect x="0" y="8" width="3" height="4" rx="1" fill="#1b1813"/><rect x="5" y="5" width="3" height="7" rx="1" fill="#1b1813"/><rect x="10" y="2.5" width="3" height="9.5" rx="1" fill="#1b1813"/><rect x="15" y="0" width="3" height="12" rx="1" fill="#1b1813" opacity=".35"/></svg>
+                  <svg width="13" height="9" viewBox="0 0 16 11" fill="none"><path d="M8 2.2c2.4 0 4.6.9 6.2 2.4l1.2-1.3A11 11 0 0 0 8 0 11 11 0 0 0 .6 3.3l1.2 1.3A8.6 8.6 0 0 1 8 2.2z" fill="#1b1813"/><path d="M8 5.6c1.5 0 2.8.6 3.8 1.5l1.2-1.3A7.4 7.4 0 0 0 8 3.8a7.4 7.4 0 0 0-5 1.9l1.2 1.4A5.5 5.5 0 0 1 8 5.6z" fill="#1b1813"/><path d="M8 8.9 9.9 7A2.8 2.8 0 0 0 8 6.3 2.8 2.8 0 0 0 6.1 7L8 8.9z" fill="#1b1813"/></svg>
+                  <svg width="20" height="10" viewBox="0 0 26 13" fill="none"><rect x="1" y="1" width="22" height="11" rx="3" stroke="#1b1813" stroke-opacity=".4"/><rect x="3" y="3" width="16" height="7" rx="1.5" fill="#1b1813"/><rect x="24" y="4" width="2" height="5" rx="1" fill="#1b1813" opacity=".4"/></svg>
+                </span>
+              </div>
+              <div class="ph-chat">
+                <div class="pm-row">
+                  <span class="pm-name you"><span class="pa"></span>Joana</span>
+                  <span class="pm-bub">Hi! I want to return these boots — they're too small.</span>
+                </div>
+                <div class="pm-row">
+                  <span class="pm-name ai"><span class="pa"></span>Store manager</span>
+                  <span class="pm-bub">No problem, Joana. Your order #1024 is still in the 30-day window. Want a size 9 exchange or a refund?</span>
+                </div>
+                <div class="pm-row">
+                  <span class="pm-name you"><span class="pa"></span>Joana</span>
+                  <span class="pm-bub">Exchange for a 9, please.</span>
+                </div>
+                <div class="pm-row">
+                  <span class="pm-name ai"><span class="pa"></span>Store manager</span>
+                  <span class="pm-bub">Done — a prepaid label is on its way to your email, and I've reserved a size 9. Anything else?</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 · REFINE -->
+  <section class="slide detail" id="s-refine">
+    <div class="slide-inner">
+      <div class="split">
+        <div class="split-copy">
+          <div class="eyebrow accent"><span class="dot"></span>Step 03 · Day 10</div>
+          <div class="detail-head"><h2>Refine</h2></div>
+          <p class="body">You review real conversations and flag what's missing. We iterate on intents, tone, and edge cases together, and validate against your priority journeys until it's ready for live traffic.</p>
+          <div class="chips">
+            <span class="chip">Intents</span><span class="chip">Tone</span>
+            <span class="chip">Edge cases</span><span class="chip">Your sign-off</span>
+          </div>
+          <div class="mini">
+            <div class="mini-bar"><span class="mini-fill" style="width:72%"></span></div>
+            <div class="mini-label">Step 3 of 4</div>
+          </div>
+        </div>
+
+        <figure class="figure" data-slot="refine">
+          <!-- Swap in a real image any time: <img src="refine.png" alt="Reviewing conversations and flagging gaps"> -->
+          <img alt="">
+          <div class="mock mock-soft">
+            <div class="review glass">
+              <div class="rv-title">Review queue<span class="c">3 to review</span></div>
+              <div class="rrow">
+                <span class="rav"></span>
+                <span class="rtxt"><b>Sizing question</b><i></i></span>
+                <span class="rtag flag">Flag gap</span>
+              </div>
+              <div class="rrow">
+                <span class="rav"></span>
+                <span class="rtxt"><b>Refund timing</b><i></i></span>
+                <span class="rtag edit">Edit tone</span>
+              </div>
+              <div class="rrow">
+                <span class="rav"></span>
+                <span class="rtxt"><b>Order status</b><i></i></span>
+                <span class="rtag ok">Approved</span>
+              </div>
+            </div>
+          </div>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 · GO LIVE -->
+  <section class="slide detail" id="s-golive">
+    <div class="slide-inner">
+      <div class="eyebrow accent"><span class="dot"></span>Step 04 · Day 14</div>
+      <div class="detail-head"><h2>Go live, on your terms</h2></div>
+      <p class="body">We start at a small slice of live conversations, watch the logs and KPIs, and scale in stages — only as the numbers hold. You control the dial the whole way.</p>
+      <div class="stages">
+        <div class="stage">
+          <div class="pct">1%</div>
+          <div class="slab">Test</div>
+          <div class="scopy">Launch to a small slice of conversations. Watch logs and edge cases live.</div>
+        </div>
+        <div class="stage">
+          <div class="pct">25%</div>
+          <div class="slab">Validate</div>
+          <div class="scopy">Open up once quality holds. Compare KPIs against your baseline.</div>
+        </div>
+        <div class="stage">
+          <div class="pct">100%</div>
+          <div class="slab">Full</div>
+          <div class="scopy">Scale to every customer. Crossword keeps learning from live traffic.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 · CTA -->
+  <section class="slide" id="s-cta">
+    <div class="slide-inner">
+      <div class="split">
+        <div class="split-copy dotband">
+          <div class="eyebrow"><span class="dot"></span>Next step</div>
+          <h2>Ready when you are</h2>
+          <p class="body">We'll send your signup link. Connect your store, and we'll have a working preview in your hands within the week.</p>
+          <div class="cta-link">Get your link <span>&rarr;</span></div>
+        </div>
+        <figure class="figure" data-slot="cta">
+          <!-- Swap in a real image any time: <img src="cta.png" alt="Crossword live across channels"> -->
+          <img alt="">
+          <div class="mock mock-warm">
+            <div class="live">
+              <div class="live-orbit">
+                <span class="appic"><svg viewBox="0 0 24 24" fill="none"><path d="M16.3 5.3c-.1-.1-.2-.1-.3-.1l-1.3.1c-.4-.7-1.1-1.5-2.1-1.5h-.2c-.4-.5-.9-.7-1.4-.7-1.3 0-2 1.6-2.4 2.7l-1.6.5c-.5.2-.5.2-.6.7L4.6 19.4 13 21l4.6-1L16.3 5.3z" fill="#95BF47"/></svg></span>
+                <span class="appic"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.7 4.8-1.3A10 10 0 1 0 12 2z" fill="#25D366"/><path d="M9 7.5c-.2-.5-.4-.5-.6-.5h-.5c-.2 0-.5.1-.7.3-.3.3-.9.9-.9 2.1s.9 2.4 1 2.6c.1.2 1.8 2.9 4.5 3.9 2.2.9 2.7.7 3.2.7s1.5-.6 1.7-1.2c.2-.6.2-1.1.1-1.2 0-.1-.2-.2-.5-.3l-1.7-.8c-.2-.1-.4-.1-.6.1l-.6.8c-.1.2-.3.2-.5.1-.3-.1-1.1-.4-2-1.3-.7-.6-1.2-1.4-1.3-1.6-.1-.2 0-.4.1-.5l.4-.5c.1-.2.1-.3.2-.5 0-.2 0-.3 0-.5L9 7.5z" fill="#fff"/></svg></span>
+                <span class="appic"><svg viewBox="0 0 24 24" fill="none"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5" fill="url(#ig2)"/><circle cx="12" cy="12" r="4" fill="none" stroke="#fff" stroke-width="1.7"/><circle cx="17.2" cy="6.8" r="1.2" fill="#fff"/><defs><linearGradient id="ig2" x1="3" y1="21" x2="21" y2="3"><stop stop-color="#FEDA75"/><stop offset=".45" stop-color="#FA7E1E"/><stop offset=".7" stop-color="#D62976"/><stop offset="1" stop-color="#962FBF"/></linearGradient></defs></svg></span>
+                <span class="appic"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2C6.5 2 2 6.1 2 11.2c0 2.9 1.4 5.4 3.7 7.1V22l3.4-1.9c.9.2 1.9.4 2.9.4 5.5 0 10-4.1 10-9.3S17.5 2 12 2z" fill="#0084FF"/><path d="M5.9 14.5l3.3-3.5 1.7 1.8 3.1-1.8-3.3 3.5-1.7-1.8-3.1 1.8z" fill="#fff"/></svg></span>
+              </div>
+              <div class="live-card glass">
+                <span class="wg-live"><i></i></span>
+                <b>Live across every channel</b>
+              </div>
+            </div>
+          </div>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- chrome -->
+<div class="chrome">
+  <div class="brand"><b>Crossword</b> · Onboarding</div>
+  <div class="nav">
+    <div class="dots" id="dots"></div>
+    <div class="arrows">
+      <button id="prev" aria-label="Previous slide">&#8249;</button>
+      <button id="next" aria-label="Next slide">&#8250;</button>
+    </div>
+    <div class="count"><b id="cur">1</b> / <span id="tot">7</span></div>
+  </div>
+</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const dotsWrap = document.getElementById('dots');
+  const prevBtn = document.getElementById('prev');
+  const nextBtn = document.getElementById('next');
+  const curEl = document.getElementById('cur');
+  document.getElementById('tot').textContent = slides.length;
+  let i = 0;
+
+  slides.forEach((_, n) => {
+    const d = document.createElement('i');
+    d.tabIndex = 0; d.setAttribute('role','button'); d.setAttribute('aria-label','Go to slide '+(n+1));
+    d.addEventListener('click', () => go(n));
+    d.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' '){e.preventDefault();go(n);} });
+    dotsWrap.appendChild(d);
+  });
+  const dots = Array.from(dotsWrap.children);
+
+  function go(n){
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, n2) => s.classList.toggle('active', n2 === i));
+    dots.forEach((d, n2) => d.classList.toggle('on', n2 === i));
+    curEl.textContent = i + 1;
+    prevBtn.disabled = i === 0;
+    nextBtn.disabled = i === slides.length - 1;
+  }
+  const nextSlide = () => go(i + 1);
+  const prevSlide = () => go(i - 1);
+
+  nextBtn.addEventListener('click', nextSlide);
+  prevBtn.addEventListener('click', prevSlide);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'PageDown') nextSlide();
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') prevSlide();
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(slides.length - 1);
+  });
+
+  // touch swipe
+  let x0 = null;
+  document.addEventListener('touchstart', e => x0 = e.touches[0].clientX, {passive:true});
+  document.addEventListener('touchend', e => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0;
+    if (Math.abs(dx) > 50) dx < 0 ? nextSlide() : prevSlide();
+    x0 = null;
+  }, {passive:true});
+
+  go(0);
+</script>
+</body>
+</html>
